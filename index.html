@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Valheim Base Planner</title>
+  <title>Valheim Base Blueprint Vault &amp; Planner</title>
   <style>
     :root {
       --bg: #12110e;
@@ -33,7 +33,7 @@
         var(--bg);
     }
 
-    header, main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+    header, .dashboard { width: min(1280px, calc(100% - 32px)); margin: 0 auto; }
 
     header {
       display: flex;
@@ -52,13 +52,13 @@
       text-transform: uppercase;
     }
 
-    h1 { margin: 0; font-size: clamp(1.7rem, 2vw, 2.2rem); letter-spacing: -0.03em; }
+    h1 { margin: 0; font-size: clamp(1.6rem, 2vw, 2.15rem); letter-spacing: -0.03em; }
     h2, h3 { margin: 0; font-size: 0.95rem; }
     .lede { margin: 8px 0 0; max-width: 46rem; color: var(--muted); line-height: 1.45; }
 
-    main {
+    .dashboard {
       display: grid;
-      grid-template-columns: 250px minmax(0, 1fr) 270px;
+      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
       gap: 18px;
       align-items: start;
       padding-bottom: 36px;
@@ -72,12 +72,87 @@
       padding: 16px;
     }
 
-    .materials { position: sticky; top: 16px; }
+    .vault { display: grid; gap: 12px; align-content: start; }
+    .panel h2 { color: #efe4d2; }
 
-    .panel h2 {
-      margin-bottom: 12px;
-      color: #efe4d2;
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
     }
+
+    .filter, .load, .tool, .reset {
+      border-radius: 12px;
+      border: 1px solid #4a4034;
+      background: #1a1814;
+      color: var(--ink);
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .filter {
+      padding: 7px 10px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .filter[aria-pressed="true"] {
+      color: #1a1206;
+      background: var(--amber);
+      border-color: var(--amber);
+    }
+
+    .idea-list {
+      display: grid;
+      gap: 12px;
+      max-height: calc(100vh - 230px);
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .idea {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid #4a4034;
+      background: #1a1814;
+    }
+
+    .idea.is-loaded { border-color: var(--amber); box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.4); }
+    .idea h3 { font-size: 1rem; }
+    .idea p { margin: 0; color: var(--muted); font-size: 0.84rem; line-height: 1.4; }
+
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: var(--forest);
+      color: #d7ecdf;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .load {
+      padding: 9px 12px;
+      background: #3a2a12;
+      border-color: var(--amber-deep);
+      color: #ffe7bf;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .empty-vault { margin: 0; color: var(--muted); font-size: 0.88rem; }
+
+    .planner {
+      display: grid;
+      grid-template-columns: 210px minmax(0, 1fr) 220px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .materials { position: sticky; top: 16px; }
 
     #tool-list, .totals, .breakdown {
       display: grid;
@@ -87,16 +162,7 @@
       list-style: none;
     }
 
-    .tool, .reset {
-      width: 100%;
-      border-radius: 12px;
-      border: 1px solid #4a4034;
-      background: #1a1814;
-      color: var(--ink);
-      text-align: left;
-      cursor: pointer;
-      font: inherit;
-    }
+    .tool, .reset { width: 100%; text-align: left; }
 
     .tool {
       display: grid;
@@ -121,7 +187,7 @@
       box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.45);
     }
 
-    .tool:focus-visible, .reset:focus-visible, .cell:focus-visible {
+    .tool:focus-visible, .reset:focus-visible, .filter:focus-visible, .load:focus-visible, .cell:focus-visible {
       outline: 2px solid var(--amber);
       outline-offset: 2px;
     }
@@ -145,13 +211,14 @@
       font-size: 0.85rem;
     }
 
-    #active-label { color: var(--ink); font-weight: 650; }
+    #active-label, #loaded-label { color: var(--ink); font-weight: 650; }
+    .stage-meta { display: grid; gap: 2px; }
 
     #grid {
       display: grid;
       grid-template-columns: repeat(12, minmax(0, 1fr));
       gap: 3px;
-      width: min(100%, 680px);
+      width: min(100%, 560px);
       margin: 0 auto;
       padding: 10px;
       aspect-ratio: 1;
@@ -172,31 +239,30 @@
       box-shadow: inset 0 0 0 1px rgba(255, 244, 220, 0.05);
     }
 
-    .piece-floor {
-      background: repeating-linear-gradient(90deg, #7a4e28 0 18%, #8d5c30 18% 22%, #684220 22% 100%);
+    .cell.is-arriving { animation: arrive 240ms ease; }
+
+    @keyframes arrive {
+      from { transform: scale(0.45); filter: brightness(1.8); }
+      to { transform: scale(1); filter: brightness(1); }
     }
 
+    .piece-floor { background: repeating-linear-gradient(90deg, #7a4e28 0 18%, #8d5c30 18% 22%, #684220 22% 100%); }
     .piece-wall {
       background: repeating-linear-gradient(180deg, #4a2a16 0 22%, #6b3d20 22% 28%, #3a2010 28% 100%);
       box-shadow: inset 0 0 0 2px #2a160c;
     }
-
     .piece-pillar {
       background:
         radial-gradient(circle at 50% 46%, #8fd0a8 0 18%, #1f7a48 19% 42%, #0e3d26 43% 68%, transparent 69%),
         #163528;
     }
-
     .piece-stone {
       background:
         linear-gradient(#3e4750, #3e4750) center / 100% 1px no-repeat,
         linear-gradient(#3e4750, #3e4750) center / 1px 100% no-repeat,
         repeating-linear-gradient(#7b8794, #7b8794 7px, #636e7a 7px 8px);
     }
-
-    .piece-hearth {
-      background: radial-gradient(circle at 50% 58%, #ffe7a3 0 14%, #f59e0b 18% 32%, #c2410c 36% 52%, #3b1a0c 56% 100%);
-    }
+    .piece-hearth { background: radial-gradient(circle at 50% 58%, #ffe7a3 0 14%, #f59e0b 18% 32%, #c2410c 36% 52%, #3b1a0c 56% 100%); }
 
     .swatch-eraser { background: repeating-linear-gradient(135deg, #3a342c 0 4px, #171512 4px 8px); }
     .swatch-floor { background: #8d5c30; }
@@ -216,7 +282,7 @@
     }
 
     .total b {
-      font-size: 1.45rem;
+      font-size: 1.35rem;
       font-variant-numeric: tabular-nums;
       color: var(--amber);
     }
@@ -248,12 +314,13 @@
       font-weight: 700;
     }
 
-    .reset:hover, .tool:hover { filter: brightness(1.08); }
+    .reset:hover, .tool:hover, .load:hover, .filter:hover { filter: brightness(1.08); }
 
-    @media (max-width: 980px) {
-      header { align-items: flex-start; flex-direction: column; }
-      main { grid-template-columns: 1fr; }
+    @media (max-width: 1100px) {
+      .dashboard, .planner { grid-template-columns: 1fr; }
+      .idea-list { max-height: 420px; }
       .materials { position: static; }
+      header { align-items: flex-start; flex-direction: column; }
       #grid { width: min(100%, 640px); }
     }
   </style>
@@ -262,35 +329,50 @@
   <header>
     <div>
       <p class="eyebrow">Base construction blueprint</p>
-      <h1>Valheim Base Planner</h1>
-      <p class="lede">Paint a 12×12 building zone. Click or drag to place pieces. Wood, Core Wood, and Stone update from whatever is on the grid.</p>
+      <h1>Valheim Base Blueprint Vault &amp; Planner</h1>
+      <p class="lede">Load a saved idea into the 12×12 zone, then paint over it. Wood, Core Wood, and Stone update from whatever is on the grid.</p>
     </div>
     <button id="reset" class="reset" type="button">Reset grid</button>
   </header>
-  <main>
-    <section class="panel" aria-labelledby="tools-heading">
-      <h2 id="tools-heading">Building tools</h2>
-      <div id="tool-list" role="toolbar" aria-label="Building tools"></div>
-    </section>
-    <section class="stage" aria-labelledby="grid-heading">
-      <div class="stage-bar">
-        <h2 id="grid-heading" class="visually-hidden">Building zone</h2>
-        <span id="active-label"></span>
-        <span id="fill-count"></span>
+  <div class="dashboard">
+    <section class="panel vault" aria-labelledby="vault-heading">
+      <h2 id="vault-heading">Idea Vault</h2>
+      <div class="filters" role="toolbar" aria-label="Filter blueprints by material">
+        <button class="filter" type="button" data-filter="all" aria-pressed="true">All Materials</button>
+        <button class="filter" type="button" data-filter="wood" aria-pressed="false">Wood Only</button>
+        <button class="filter" type="button" data-filter="coreWood" aria-pressed="false">Core Wood</button>
+        <button class="filter" type="button" data-filter="stone" aria-pressed="false">Stone</button>
       </div>
-      <div id="grid" role="grid" aria-label="12 by 12 building zone"></div>
+      <div id="idea-list" class="idea-list"></div>
     </section>
-    <aside class="panel materials" aria-live="polite">
-      <h2>Material shopping list</h2>
-      <ul class="totals">
-        <li class="total"><span>Wood</span><b id="total-wood">0</b></li>
-        <li class="total"><span>Core Wood</span><b id="total-coreWood">0</b></li>
-        <li class="total"><span>Stone</span><b id="total-stone">0</b></li>
-      </ul>
-      <h3>Placed pieces</h3>
-      <ul id="breakdown" class="breakdown"></ul>
-    </aside>
-  </main>
+    <section class="planner" aria-label="Grid planner">
+      <section class="panel" aria-labelledby="tools-heading">
+        <h2 id="tools-heading">Building tools</h2>
+        <div id="tool-list" role="toolbar" aria-label="Building tools"></div>
+      </section>
+      <section class="stage" aria-labelledby="grid-heading">
+        <div class="stage-bar">
+          <div class="stage-meta">
+            <h2 id="grid-heading" class="visually-hidden">Building zone</h2>
+            <span id="loaded-label">Blank layout</span>
+            <span id="active-label"></span>
+          </div>
+          <span id="fill-count"></span>
+        </div>
+        <div id="grid" role="grid" aria-label="12 by 12 building zone"></div>
+      </section>
+      <aside class="panel materials" aria-live="polite">
+        <h2>Material shopping list</h2>
+        <ul class="totals">
+          <li class="total"><span>Wood</span><b id="total-wood">0</b></li>
+          <li class="total"><span>Core Wood</span><b id="total-coreWood">0</b></li>
+          <li class="total"><span>Stone</span><b id="total-stone">0</b></li>
+        </ul>
+        <h3>Placed pieces</h3>
+        <ul id="breakdown" class="breakdown"></ul>
+      </aside>
+    </section>
+  </div>
   <script>
     const GRID_SIZE = 12;
     const MATERIALS = [
@@ -298,6 +380,7 @@
       { key: "coreWood", label: "Core Wood" },
       { key: "stone", label: "Stone" }
     ];
+    const GLYPHS = { f: "floor", w: "wall", p: "pillar", s: "stone", h: "hearth" };
 
     const ERASER = {
       id: "eraser",
@@ -308,64 +391,128 @@
     };
 
     const PIECES = {
-      floor: {
-        id: "floor",
-        name: "Wood Floor",
-        detail: "2×2m",
-        costLabel: "2 Wood",
-        costs: { wood: 2 }
-      },
-      wall: {
-        id: "wall",
-        name: "Wood Wall",
-        detail: "2×2m",
-        costLabel: "2 Wood",
-        costs: { wood: 2 }
-      },
-      pillar: {
-        id: "pillar",
-        name: "Core Wood Pillar",
-        detail: "4m",
-        costLabel: "2 Core Wood",
-        costs: { coreWood: 2 }
-      },
-      stone: {
-        id: "stone",
-        name: "Stone Wall",
-        detail: "2×1m",
-        costLabel: "4 Stone",
-        costs: { stone: 4 }
-      },
-      hearth: {
-        id: "hearth",
-        name: "Hearth / Campfire",
-        detail: "Fire",
-        costLabel: "5 Stone + 2 Wood",
-        costs: { stone: 5, wood: 2 }
-      }
+      floor: { id: "floor", name: "Wood Floor", detail: "2×2m", costLabel: "2 Wood", costs: { wood: 2 } },
+      wall: { id: "wall", name: "Wood Wall", detail: "2×2m", costLabel: "2 Wood", costs: { wood: 2 } },
+      pillar: { id: "pillar", name: "Core Wood Pillar", detail: "4m", costLabel: "2 Core Wood", costs: { coreWood: 2 } },
+      stone: { id: "stone", name: "Stone Wall", detail: "2×1m", costLabel: "4 Stone", costs: { stone: 4 } },
+      hearth: { id: "hearth", name: "Hearth / Campfire", detail: "Fire", costLabel: "5 Stone + 2 Wood", costs: { stone: 5, wood: 2 } }
     };
+
+    const IDEAS = [
+      {
+        id: "a-frame",
+        name: "Starter A-Frame",
+        summary: "A wood shell with a peaked wall line and plank floors. No core wood or stone.",
+        materials: ["wood"],
+        rows: [
+          "............",
+          ".....ww.....",
+          "....wffw....",
+          "...wffffw...",
+          "..wffffffw..",
+          ".wffffffffw.",
+          "wwwwwwwwwwww",
+          "............",
+          "............",
+          "............",
+          "............",
+          "............"
+        ]
+      },
+      {
+        id: "outpost",
+        name: "Core Wood Outpost",
+        summary: "A raised wood platform braced by core wood pillars at the corners and gate.",
+        materials: ["wood", "coreWood"],
+        rows: [
+          "............",
+          "..pwwwwwwp..",
+          "..wffffffw..",
+          "..wf....fw..",
+          "..wf.ff.fw..",
+          "..wffffffw..",
+          "..pwwwwwwp..",
+          ".....pp.....",
+          "............",
+          "............",
+          "............",
+          "............"
+        ]
+      },
+      {
+        id: "keep",
+        name: "Fortified Keep",
+        summary: "A stone curtain wall around wood floors, with a hearth in the inner yard.",
+        materials: ["wood", "stone"],
+        rows: [
+          "ssssssssssss",
+          "sffffffffffs",
+          "sf........fs",
+          "sf.ffffff.fs",
+          "sf.f.hh.f.fs",
+          "sf.ffffff.fs",
+          "sf........fs",
+          "sffffffffffs",
+          "ssssssssssss",
+          "............",
+          "............",
+          "............"
+        ]
+      },
+      {
+        id: "longhouse",
+        name: "Viking Longhouse",
+        summary: "Stone gables, a core wood ridge, wood walls and floors, and a central hearth.",
+        materials: ["wood", "coreWood", "stone"],
+        rows: [
+          "............",
+          ".ssssssssss.",
+          ".spppppppps.",
+          ".swffffffws.",
+          ".swf.hh.fws.",
+          ".swffffffws.",
+          ".spppppppps.",
+          ".ssssssssss.",
+          "............",
+          "............",
+          "............",
+          "............"
+        ]
+      }
+    ];
 
     const TOOLS = [ERASER, ...Object.values(PIECES)];
     const grid = Array.from({ length: GRID_SIZE * GRID_SIZE }, () => null);
     let activeTool = "floor";
+    let activeFilter = "all";
+    let loadedIdeaId = null;
     let painting = false;
+    let loadToken = 0;
 
     const toolList = document.querySelector("#tool-list");
     const gridEl = document.querySelector("#grid");
+    const ideaList = document.querySelector("#idea-list");
     const activeLabel = document.querySelector("#active-label");
+    const loadedLabel = document.querySelector("#loaded-label");
     const fillCount = document.querySelector("#fill-count");
     const breakdown = document.querySelector("#breakdown");
     const totalNodes = Object.fromEntries(
       MATERIALS.map((material) => [material.key, document.querySelector("#total-" + material.key)])
     );
 
+    function renderCell(index, arriving) {
+      const pieceId = grid[index];
+      const cell = gridEl.children[index];
+      cell.className = "cell" + (pieceId ? " piece-" + pieceId : "") + (arriving ? " is-arriving" : "");
+      cell.setAttribute("aria-label", pieceId ? PIECES[pieceId].name : "Empty tile");
+    }
+
     function paintCell(index) {
       const next = activeTool === "eraser" ? null : activeTool;
       if (grid[index] === next) return;
+      loadToken += 1;
       grid[index] = next;
-      const cell = gridEl.children[index];
-      cell.className = "cell" + (next ? " piece-" + next : "");
-      cell.setAttribute("aria-label", next ? PIECES[next].name : "Empty tile");
+      renderCell(index, false);
       updateTotals();
     }
 
@@ -385,9 +532,8 @@
         if (!pieceId) return;
         filled += 1;
         counts[pieceId] += 1;
-        const costs = PIECES[pieceId].costs;
-        Object.keys(costs).forEach((key) => {
-          totals[key] += costs[key];
+        Object.entries(PIECES[pieceId].costs).forEach(([key, amount]) => {
+          totals[key] += amount;
         });
       });
 
@@ -407,7 +553,9 @@
       });
 
       const tool = TOOLS.find((entry) => entry.id === activeTool);
+      const idea = IDEAS.find((entry) => entry.id === loadedIdeaId);
       activeLabel.textContent = tool.name + (tool.detail ? " · " + tool.detail : "");
+      loadedLabel.textContent = idea ? idea.name : "Blank layout";
       fillCount.textContent = filled + " / " + grid.length + " tiles";
     }
 
@@ -419,14 +567,109 @@
       updateTotals();
     }
 
-    function resetGrid() {
+    function clearGrid() {
       grid.fill(null);
       Array.from(gridEl.children).forEach((cell) => {
         cell.className = "cell";
         cell.setAttribute("aria-label", "Empty tile");
       });
-      updateTotals();
     }
+
+    function resetGrid() {
+      loadToken += 1;
+      loadedIdeaId = null;
+      clearGrid();
+      updateTotals();
+      renderIdeas();
+    }
+
+    function cellsForIdea(idea) {
+      const placed = [];
+      idea.rows.forEach((row, y) => {
+        Array.from(row).forEach((glyph, x) => {
+          const pieceId = GLYPHS[glyph];
+          if (!pieceId) return;
+          placed.push({ index: y * GRID_SIZE + x, pieceId });
+        });
+      });
+      return placed;
+    }
+
+    function loadIdea(idea) {
+      const token = loadToken + 1;
+      loadToken = token;
+      painting = false;
+      loadedIdeaId = idea.id;
+      clearGrid();
+      updateTotals();
+      renderIdeas();
+
+      cellsForIdea(idea).forEach((placement, step) => {
+        window.setTimeout(() => {
+          if (token !== loadToken) return;
+          grid[placement.index] = placement.pieceId;
+          renderCell(placement.index, true);
+          updateTotals();
+        }, step * 18);
+      });
+    }
+
+    function ideaMatches(idea) {
+      if (activeFilter === "all") return true;
+      if (activeFilter === "wood") return idea.materials.length === 1 && idea.materials[0] === "wood";
+      return idea.materials.includes(activeFilter);
+    }
+
+    function renderIdeas() {
+      ideaList.replaceChildren();
+      const visible = IDEAS.filter(ideaMatches);
+      if (!visible.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty-vault";
+        empty.textContent = "No saved blueprints match this material filter.";
+        ideaList.append(empty);
+        return;
+      }
+
+      visible.forEach((idea) => {
+        const card = document.createElement("article");
+        card.className = "idea" + (idea.id === loadedIdeaId ? " is-loaded" : "");
+
+        const title = document.createElement("h3");
+        title.textContent = idea.name;
+
+        const summary = document.createElement("p");
+        summary.textContent = idea.summary;
+
+        const tags = document.createElement("div");
+        tags.className = "tags";
+        idea.materials.forEach((key) => {
+          const tag = document.createElement("span");
+          tag.className = "tag";
+          tag.textContent = MATERIALS.find((material) => material.key === key).label;
+          tags.append(tag);
+        });
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "load";
+        button.textContent = "Load Layout into Planner";
+        button.addEventListener("click", () => loadIdea(idea));
+
+        card.append(title, summary, tags, button);
+        ideaList.append(card);
+      });
+    }
+
+    document.querySelectorAll(".filter").forEach((button) => {
+      button.addEventListener("click", () => {
+        activeFilter = button.dataset.filter;
+        document.querySelectorAll(".filter").forEach((filter) => {
+          filter.setAttribute("aria-pressed", String(filter === button));
+        });
+        renderIdeas();
+      });
+    });
 
     TOOLS.forEach((tool) => {
       const button = document.createElement("button");
@@ -485,6 +728,7 @@
     visuallyHidden.textContent = ".visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}";
     document.head.append(visuallyHidden);
 
+    renderIdeas();
     updateTotals();
   </script>
 </body>
