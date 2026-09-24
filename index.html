@@ -661,7 +661,7 @@
       const tool = TOOLS.find((entry) => entry.id === activeTool);
       const idea = allIdeas().find((entry) => entry.id === loadedIdeaId);
       activeLabel.textContent = tool.name + (tool.detail ? " · " + tool.detail : "");
-      loadedLabel.textContent = idea ? idea.name : "Blank layout";
+      loadedLabel.textContent = idea ? idea.name : (grid.some(Boolean) ? "Unsaved layout" : "Blank layout");
       fillCount.textContent = filled + " / " + grid.length + " tiles";
     }
 
