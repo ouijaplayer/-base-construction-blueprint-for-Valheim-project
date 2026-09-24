@@ -314,7 +314,41 @@
       font-weight: 700;
     }
 
-    .reset:hover, .tool:hover, .load:hover, .filter:hover { filter: brightness(1.08); }
+    .save-form {
+      display: grid;
+      gap: 8px;
+      padding-top: 4px;
+      border-top: 1px solid #4a4034;
+    }
+
+    .save-form label, .save-note { color: var(--muted); font-size: 0.8rem; }
+    .save-note { margin: 0; min-height: 1.1em; }
+    .save-form input {
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 12px;
+      border: 1px solid #4a4034;
+      background: #12110e;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    .card-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .remove {
+      padding: 9px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--danger);
+      background: #3a2218;
+      color: #ffd7c2;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .tag-movie { background: #3a2a12; color: #ffe7bf; }
+    .tag-custom { background: #3a2218; color: #ffd7c2; }
+
+    .reset:hover, .tool:hover, .load:hover, .filter:hover, .remove:hover { filter: brightness(1.08); }
 
     @media (max-width: 1100px) {
       .dashboard, .planner { grid-template-columns: 1fr; }
@@ -330,7 +364,7 @@
     <div>
       <p class="eyebrow">Base construction blueprint</p>
       <h1>Valheim Base Blueprint Vault &amp; Planner</h1>
-      <p class="lede">Load a saved idea into the 12×12 zone, then paint over it. Wood, Core Wood, and Stone update from whatever is on the grid.</p>
+      <p class="lede">Load a movie-style silhouette or a build you saved, then paint over it. Custom builds stay in this browser.</p>
     </div>
     <button id="reset" class="reset" type="button">Reset grid</button>
   </header>
@@ -342,8 +376,15 @@
         <button class="filter" type="button" data-filter="wood" aria-pressed="false">Wood Only</button>
         <button class="filter" type="button" data-filter="coreWood" aria-pressed="false">Core Wood</button>
         <button class="filter" type="button" data-filter="stone" aria-pressed="false">Stone</button>
+        <button class="filter" type="button" data-filter="movie" aria-pressed="false">Movie look</button>
       </div>
       <div id="idea-list" class="idea-list"></div>
+      <form id="save-form" class="save-form">
+        <label for="build-name">Save the grid as your own build</label>
+        <input id="build-name" name="build-name" maxlength="40" placeholder="Name, such as Helm's Deep gate" autocomplete="off">
+        <button class="load" type="submit">Save current grid</button>
+        <p id="save-note" class="save-note" role="status"></p>
+      </form>
     </section>
     <section class="planner" aria-label="Grid planner">
       <section class="panel" aria-labelledby="tools-heading">
@@ -381,6 +422,8 @@
       { key: "stone", label: "Stone" }
     ];
     const GLYPHS = { f: "floor", w: "wall", p: "pillar", s: "stone", h: "hearth" };
+    const PIECE_GLYPH = { floor: "f", wall: "w", pillar: "p", stone: "s", hearth: "h" };
+    const STORAGE_KEY = "valheim-planner-builds";
 
     const ERASER = {
       id: "eraser",
@@ -478,6 +521,69 @@
           "............",
           "............"
         ]
+      },
+      {
+        id: "helms-deep",
+        name: "Deeping Wall",
+        theme: "movie",
+        summary: "A stone curtain with a wood gate and pillar buttresses, in the shape of a fortress wall from a siege film.",
+        materials: ["wood", "coreWood", "stone"],
+        rows: [
+          "............",
+          "ssssssssssss",
+          "ssssssssssss",
+          "sssswwwwssss",
+          "ssswffffwsss",
+          "ssswfhhfwsss",
+          "ssswffffwsss",
+          "ssspppppssss",
+          "............",
+          "............",
+          "............",
+          "............"
+        ]
+      },
+      {
+        id: "hobbit-hole",
+        name: "Round Hill House",
+        theme: "movie",
+        summary: "A round door set into a stone hill, with a wood room and hearth inside. A hobbit-house silhouette.",
+        materials: ["wood", "stone"],
+        rows: [
+          "............",
+          "....ssss....",
+          "..ssffffss..",
+          ".ssffffffss.",
+          ".swf.hh.fws.",
+          ".ssffffffss.",
+          "..sswwwwss..",
+          "....wwww....",
+          "............",
+          "............",
+          "............",
+          "............"
+        ]
+      },
+      {
+        id: "white-city",
+        name: "Tiered White City",
+        theme: "movie",
+        summary: "Concentric stone rings around a wood court and hearth, like a white-city terrace from a fantasy film.",
+        materials: ["wood", "stone"],
+        rows: [
+          "............",
+          "..ssssssss..",
+          "..sffffffs..",
+          "..sfssssfs..",
+          "..sfsffsfs..",
+          "..sfshhsfs..",
+          "..sfsffsfs..",
+          "..sfssssfs..",
+          "..sffffffs..",
+          "..ssssssss..",
+          "............",
+          "............"
+        ]
       }
     ];
 
@@ -553,7 +659,7 @@
       });
 
       const tool = TOOLS.find((entry) => entry.id === activeTool);
-      const idea = IDEAS.find((entry) => entry.id === loadedIdeaId);
+      const idea = allIdeas().find((entry) => entry.id === loadedIdeaId);
       activeLabel.textContent = tool.name + (tool.detail ? " · " + tool.detail : "");
       loadedLabel.textContent = idea ? idea.name : "Blank layout";
       fillCount.textContent = filled + " / " + grid.length + " tiles";
@@ -614,15 +720,86 @@
       });
     }
 
+    function readCustomBuilds() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        return Array.isArray(stored) ? stored.filter((idea) => idea && idea.id && Array.isArray(idea.rows)) : [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function writeCustomBuilds(builds) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(builds));
+    }
+
+    function allIdeas() {
+      return readCustomBuilds().concat(IDEAS);
+    }
+
+    function rowsFromGrid() {
+      const rows = [];
+      for (let y = 0; y < GRID_SIZE; y += 1) {
+        let row = "";
+        for (let x = 0; x < GRID_SIZE; x += 1) {
+          const pieceId = grid[y * GRID_SIZE + x];
+          row += pieceId ? PIECE_GLYPH[pieceId] : ".";
+        }
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    function materialsOnGrid() {
+      const used = new Set();
+      grid.forEach((pieceId) => {
+        if (!pieceId) return;
+        Object.keys(PIECES[pieceId].costs).forEach((key) => used.add(key));
+      });
+      return MATERIALS.map((material) => material.key).filter((key) => used.has(key));
+    }
+
+    function saveCurrentGrid(name) {
+      const note = document.querySelector("#save-note");
+      if (!grid.some(Boolean)) {
+        note.textContent = "Paint a layout before saving it.";
+        return;
+      }
+      const builds = readCustomBuilds();
+      const idea = {
+        id: "custom-" + Date.now(),
+        name: name,
+        summary: "A custom build saved from the planner in this browser.",
+        materials: materialsOnGrid(),
+        rows: rowsFromGrid(),
+        custom: true
+      };
+      builds.unshift(idea);
+      writeCustomBuilds(builds);
+      loadedIdeaId = idea.id;
+      note.textContent = "Saved “" + name + "”. It stays in this browser.";
+      document.querySelector("#build-name").value = "";
+      renderIdeas();
+      updateTotals();
+    }
+
+    function deleteCustomBuild(id) {
+      writeCustomBuilds(readCustomBuilds().filter((idea) => idea.id !== id));
+      if (loadedIdeaId === id) loadedIdeaId = null;
+      renderIdeas();
+      updateTotals();
+    }
+
     function ideaMatches(idea) {
       if (activeFilter === "all") return true;
+      if (activeFilter === "movie") return idea.theme === "movie";
       if (activeFilter === "wood") return idea.materials.length === 1 && idea.materials[0] === "wood";
       return idea.materials.includes(activeFilter);
     }
 
     function renderIdeas() {
       ideaList.replaceChildren();
-      const visible = IDEAS.filter(ideaMatches);
+      const visible = allIdeas().filter(ideaMatches);
       if (!visible.length) {
         const empty = document.createElement("p");
         empty.className = "empty-vault";
@@ -643,23 +820,61 @@
 
         const tags = document.createElement("div");
         tags.className = "tags";
+        if (idea.theme === "movie") {
+          const movie = document.createElement("span");
+          movie.className = "tag tag-movie";
+          movie.textContent = "Movie look";
+          tags.append(movie);
+        }
+        if (idea.custom) {
+          const yours = document.createElement("span");
+          yours.className = "tag tag-custom";
+          yours.textContent = "Your build";
+          tags.append(yours);
+        }
         idea.materials.forEach((key) => {
+          const material = MATERIALS.find((entry) => entry.key === key);
+          if (!material) return;
           const tag = document.createElement("span");
           tag.className = "tag";
-          tag.textContent = MATERIALS.find((material) => material.key === key).label;
+          tag.textContent = material.label;
           tags.append(tag);
         });
+
+        const actions = document.createElement("div");
+        actions.className = idea.custom ? "card-actions" : "";
 
         const button = document.createElement("button");
         button.type = "button";
         button.className = "load";
         button.textContent = "Load Layout into Planner";
         button.addEventListener("click", () => loadIdea(idea));
+        actions.append(button);
 
-        card.append(title, summary, tags, button);
+        if (idea.custom) {
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "remove";
+          remove.textContent = "Delete";
+          remove.addEventListener("click", () => deleteCustomBuild(idea.id));
+          actions.append(remove);
+        }
+
+        card.append(title, summary, tags, actions);
         ideaList.append(card);
       });
     }
+
+    document.querySelector("#save-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const name = document.querySelector("#build-name").value.trim();
+      const note = document.querySelector("#save-note");
+      if (!name) {
+        note.textContent = "Give the build a name before saving.";
+        return;
+      }
+      saveCurrentGrid(name);
+    });
 
     document.querySelectorAll(".filter").forEach((button) => {
       button.addEventListener("click", () => {
